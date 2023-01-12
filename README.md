@@ -72,4 +72,4 @@ if __name__ == '__main__':
 
 ```
 Results on all test functions in table format can be found in the following Table:
-![alt text](https://github.com/RoydeZomer/IOC-SAMO-COBRA/blob/main/allResults.PNG?raw=true)
+![alt text](https://github.com/RoydeZomer/IOC-SAMO-COBRA/blob/main/allresults.PNG?raw=true)
