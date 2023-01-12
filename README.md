@@ -14,8 +14,8 @@ from pSAMO_COBRA_PhaseII import pSAMO_COBRA_PhaseII
 # example test function class two variables, two constraints, two objectives
 class BNH:
     def __init__(self):
-        self.lower = np.array([0,0]) # lower bound of the variables
-        self.upper = np.array([5,3]) # upper bound of the variables
+        self.lower = np.array([0,0]) # lower bound of the decision variables
+        self.upper = np.array([5,3]) # upper bound of the decision variables
         self.nConstraints = 2 # number of constraints
         self.nObj = 2 # number of objectives
         self.ref = np.array([140,50]) # has to be filled in.  
