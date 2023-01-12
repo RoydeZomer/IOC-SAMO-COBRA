@@ -14,16 +14,16 @@ from pSAMO_COBRA_PhaseII import pSAMO_COBRA_PhaseII
 # example test function class two variables, two constraints, two objectives
 class BNH:
     def __init__(self):
-        self.lower = np.array([0,0]) # lower bound of the variables
-        self.upper = np.array([5,3]) # upper bound of the variables
+        self.lower = np.array([0,0]) # lower bound of the decision variables
+        self.upper = np.array([5,3]) # upper bound of the decision variables
         self.nConstraints = 2 # number of constraints
         self.nObj = 2 # number of objectives
-        self.ref = np.array([140,50]) # has to be filled in.  
+        self.ref = np.array([140,50]) # Maximum objective score per objective you are interested in. 
         self.nadir = np.array([136,49.24]) # optional 
         self.cheapConstr = [True,True] # constraint 1 and constraint two are considered inexpensive and are directly used
         self.cheapObj = [False,False] # both objectives are considered as expensive and will be predicted with RBFs. 
         
-    # expensive evaluation method
+    # expensive evaluation method, note that SAMO-COBRA assumes both objectives are to be minimized.
     def evaluate(self,x): 
         f1 = 4*x[0]**2+4*x[1]**2
         f2 = (x[0]-5)**2 + (x[1]-5)**2
@@ -58,7 +58,8 @@ class BNH:
 
 if __name__ == '__main__':  
     freeze_support() # required for multiprocessing on windows machines
-    seed = 1 # The algorithm starts searching new solutions from random locations in the search space. Influence the random lacations by setting the seed
+    # The algorithm starts searching new candidate solutions from random locations in the search space.
+    seed = 1 Influence the random lacations by setting the seed
     batch = 5 # how many candidate solutions do you want to evaluate per iteration? should be larger or equal to 1. 
     nCores = multiprocessing.cpu_count() # define how many cores you want to use for the optimization process. 
     
