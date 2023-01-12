@@ -18,12 +18,12 @@ class BNH:
         self.upper = np.array([5,3]) # upper bound of the decision variables
         self.nConstraints = 2 # number of constraints
         self.nObj = 2 # number of objectives
-        self.ref = np.array([140,50]) # has to be filled in.  
+        self.ref = np.array([140,50]) # Maximum objective score per objective you are interested in. 
         self.nadir = np.array([136,49.24]) # optional 
         self.cheapConstr = [True,True] # constraint 1 and constraint two are considered inexpensive and are directly used
         self.cheapObj = [False,False] # both objectives are considered as expensive and will be predicted with RBFs. 
         
-    # expensive evaluation method
+    # expensive evaluation method, note that SAMO-COBRA assumes both objectives are to be minimized.
     def evaluate(self,x): 
         f1 = 4*x[0]**2+4*x[1]**2
         f2 = (x[0]-5)**2 + (x[1]-5)**2
