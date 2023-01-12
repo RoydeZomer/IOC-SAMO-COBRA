@@ -71,3 +71,5 @@ if __name__ == '__main__':
     cobra = cheap_SAMO_COBRA_PhaseII(cobra)
 
 ```
+Results on all test functions in table format can be found in the following Table:
+![Alt text](allResults.png?raw=True "All Results on test functions")
