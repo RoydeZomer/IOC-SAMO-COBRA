@@ -286,11 +286,7 @@ def randomResultsFactory(I, fn, nConstraints, nObj, pool, batch):
             res.append(fn(row))
             res_time.append(time.time()-stt)
     else:
-        res = []
-        for i in range(int(len(I)/batch)):    
-            stt = time.time()
-            res += pool.map(fn, I[i*batch:(i+1)*batch])
-            res_time.append(time.time()-stt)
+        res = pool.map(fn, I)
     
     i = 0
     for result in res:
