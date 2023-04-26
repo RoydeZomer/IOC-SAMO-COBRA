@@ -14,7 +14,7 @@ class BICOP1:
         self.nObj = 2
         self.ref = np.array([9,9])     
         self.nadir = np.array([1, 1])
-        self.cheapConstr = [True, True]
+        self.cheapConstr = [True]
         self.cheapObj = [False, False]
 
     def evaluate(self, x):
