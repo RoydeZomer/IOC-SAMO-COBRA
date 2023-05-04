@@ -658,7 +658,7 @@ def cheap_SAMO_COBRA_PhaseII(cobra):
             indicator = [False]*len(paretoDominantSolutions)
             indicator_i = 0
             for solution in paretoDominantSolutions:
-                if solution in bestComp:
+                if any(np.sum(np.equal(solution, bestComp), axis=1)==len(bestComp[0])):
                     indicator[indicator_i] = True
                 indicator_i += 1            
             pff = pff[-len(submins_xs):]
