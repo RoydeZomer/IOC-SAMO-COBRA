@@ -13,7 +13,7 @@ class BNH:
         self.nConstraints = 2
         self.nObj = 2 
         self.ref = np.array([140,50])
-        self.nadir = np.array([136,49.24])
+        self.nadir = np.array([136,50])
         self.cheapConstr = [False,False]
         self.cheapObj = [False,False]
         

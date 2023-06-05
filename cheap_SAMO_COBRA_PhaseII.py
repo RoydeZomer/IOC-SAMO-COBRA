@@ -19,7 +19,6 @@ from hypervolume import hypervolume
 from paretofrontFeasible import paretofrontFeasible
 from visualiseParetoFront import visualiseParetoFront
 
-from scipy import optimize
 import numpy as np
 import time
 import warnings
@@ -28,6 +27,10 @@ import os
 from functools import partial
 import json
 import pygmo as pg
+
+from scipy.optimize import _cobyla as cobyla
+from scipy.optimize import OptimizeResult
+from scipy.optimize import minimize
 
 def make_json_serializable(cobra):
     for key in cobra:
@@ -69,15 +72,15 @@ def getConstraintPrediction(x, surrogateModels, bestPredictor, nConstraints, Gre
     return constraintPredictions
 
 def getEquallyImportantConstraintPrediction(x, surrogateModels, bestPredictor, nConstraints, GresRescaledDivider, fnCheap, cheapCon, EPS=None):
-    constraintPredictions = []
+    constraintPredictions = np.zeros(nConstraints)
     if any(cheapCon):
         _ , cheap_constr = fnCheap(x)
     for coni in range(nConstraints):
         if cheapCon[coni]:
             if EPS is None:
-                constraintPredictions.append(-1*(cheap_constr[coni]/GresRescaledDivider[coni]))
+                constraintPredictions[coni] = -1*(cheap_constr[coni]/GresRescaledDivider[coni])
             else:
-                constraintPredictions.append(-1*((cheap_constr[coni]/GresRescaledDivider[coni]) + EPS[coni]**2))
+                constraintPredictions[coni] = -1*((cheap_constr[coni]/GresRescaledDivider[coni]) + EPS[coni]**2)
         else:
             conKernel = bestPredictor['conKernel'][coni]
             conLogStr = bestPredictor['conLogStr'][coni]
@@ -88,16 +91,21 @@ def getEquallyImportantConstraintPrediction(x, surrogateModels, bestPredictor, n
                 constraintPrediction = plogReverse(constraintPrediction)
             
             if EPS is None:
-                constraintPredictions.append(-1*(constraintPrediction))
+                constraintPredictions[coni] = -1*(constraintPrediction)
             else:
-                constraintPredictions.append(-1*(constraintPrediction+EPS[coni]**2))
+                constraintPredictions[coni] = -1*(constraintPrediction+EPS[coni]**2)
 
     return constraintPredictions
 
 def gCOBRA(x, A, lower, upper, surrogateModels, bestPredictor, nConstraints, GresRescaledDivider, fnCheap, cheapCon, EPS):
+    
+    cliped_xu = np.minimum(x, upper)
+    cliped_x = np.maximum(cliped_xu, lower)
+    length = len(lower)
+    
     h = 0
-    distance = distLine(x, A)
-    if any(distance<=(len(A[0])/1e4)):
+    distance = distLine(cliped_x, A)
+    if any(distance<=(length/1e4)):
         if min(distance) != 0:
             h = min(distance)**-2
         else:
@@ -105,21 +113,21 @@ def gCOBRA(x, A, lower, upper, surrogateModels, bestPredictor, nConstraints, Gre
     if not all(np.isfinite(distance)):
         h = np.finfo(np.float64).max
         
-    constraintPrediction = getEquallyImportantConstraintPrediction(x, surrogateModels, bestPredictor, nConstraints, GresRescaledDivider,  fnCheap, cheapCon, EPS)
+    constraintPrediction = getEquallyImportantConstraintPrediction(cliped_x, surrogateModels, bestPredictor, nConstraints, GresRescaledDivider,  fnCheap, cheapCon, EPS)
     
-    if np.any(np.isnan(constraintPrediction)):
+    if any(np.isnan(constraintPrediction)):
         warnings.warn('gCOBRA: constraintPrediction value is NaN, returning Inf',DeprecationWarning)
-        return([np.finfo(np.float64).min]*(len(lower)*2+len(constraintPrediction)+1))
-    
+        return([np.finfo(np.float64).min]*(length*2+len(constraintPrediction)+1))
+
     boundaries = []
-    for i in range(len(lower)):
+    for i in range(length):
         boundaries.append(x[i] - lower[i])
-    for i in range(len(upper)):
+    for i in range(length):
         boundaries.append(upper[i]- x[i])
-    
+            
     h = [-1*h]
-    h = h + constraintPrediction
-    h = h + boundaries
+    h = h + list(constraintPrediction)
+    h = h + list(boundaries)
     return(h)
 
 def batch_gCOBRA(x, batch, A, lower, upper, surrogateModels, bestPredictor, nConstraints, GresRescaledDivider, fnCheap, cheapCon, EPS=None):
@@ -130,7 +138,10 @@ def batch_gCOBRA(x, batch, A, lower, upper, surrogateModels, bestPredictor, nCon
         h += gCOBRA(xi, A, lower, upper, surrogateModels, bestPredictor, nConstraints, GresRescaledDivider, fnCheap, cheapCon, EPS)
     return(h)    
 
-def get_potentialSolution(x, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, fnCheap, cheapObj):
+def get_potentialSolution(x, lower, upper, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, fnCheap, cheapObj):
+    cliped_xu = np.minimum(x, upper)
+    x = np.maximum(cliped_xu, lower)
+    
     potentialSolution = np.zeros(nObj)
     if any(cheapObj):
         cheap_obj, _ = fnCheap(x)
@@ -171,13 +182,13 @@ def get_potentialSolution(x, surrogateModels, bestPredictor, nObj, infillCriteri
             potentialSolution[obji] = potsol - np.abs(uncertainty)
     return potentialSolution
     
-def compute_infill_criteria_score(x, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, currentHV, paretoFrontier, ref, fnCheap, cheapObj):
+def compute_infill_criteria_score(x, lower, upper, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, currentHV, paretoFrontier, ref, fnCheap, cheapObj):
     if np.any(np.isnan(x)):
         return np.finfo(np.float64).max
     if not all(np.isfinite(x)):
         return np.finfo(np.float64).max
 
-    potentialSolution = get_potentialSolution(x, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, fnCheap, cheapObj)
+    potentialSolution = get_potentialSolution(x, lower, upper, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, fnCheap, cheapObj)
     if not all(np.isfinite(potentialSolution)):
         return np.finfo(np.float64).max
     
@@ -196,7 +207,7 @@ def compute_infill_criteria_score(x, surrogateModels, bestPredictor, nObj, infil
         f = currentHV + penalty
     return f
 
-def batch_infill_criteria_score(x, batch, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, paretoFrontier, ref, fnCheap, cheapObj):
+def batch_infill_criteria_score(x, batch, lower, upper, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, paretoFrontier, ref, fnCheap, cheapObj):
     if np.any(np.isnan(x)):
         return np.finfo(np.float64).max
     if not all(np.isfinite(x)):
@@ -208,14 +219,13 @@ def batch_infill_criteria_score(x, batch, surrogateModels, bestPredictor, nObj, 
     for i in range(batch):
         xi = x[i*size:(i+1)*size]
     
-        potentialSolution = get_potentialSolution(xi, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, fnCheap, cheapObj)
+        potentialSolution = get_potentialSolution(xi, lower, upper, surrogateModels, bestPredictor, nObj, infillCriteria, FresPlogStandardizedStd, FresStandardizedStd, FresPlogStandardizedMean, FresStandardizedMean, fnCheap, cheapObj)
         
         if not all(np.isfinite(potentialSolution)):
             return np.finfo(np.float64).max
         
         solutions[i] = potentialSolution
-
-    penalties = []        
+    penalties = 0      
     
     ##### add epsilon?
     tempPF = np.vstack((paretoFrontier,solutions))
@@ -226,22 +236,54 @@ def batch_infill_criteria_score(x, batch, surrogateModels, bestPredictor, nObj, 
     tempPF_dominated = tempPF[~pf_indicator]
     
     for potentialSolution in tempPF_dominated:
-        if potentialSolution not in paretoFrontier:
-            penalty = 0    
+        if not any(np.sum(np.equal(potentialSolution, paretoFrontier), axis=1)==paretoFrontier.shape[1]):
             logicBool = np.all(tempPF_pf<= potentialSolution, axis=1)
-            for j in range(tempPF_pf.shape[0]):
-                if logicBool[j]:
-                    p = - 1 + np.prod(1 + (potentialSolution-tempPF_pf[j,:]))
-                    penalty = max(penalty, p)
-            penalties.append(penalty)
+            penalty = np.max(-1 + np.prod(1 + (potentialSolution - tempPF_pf[logicBool]), axis=1))
+            penalties += penalty
     
     myhv = hypervolume(tempPF_pf, ref)
-    f = -1*myhv + sum(penalties)
+    f = -1*myhv + penalties
     return f
 
-def pool_job(xStart, criteria_function=None, cons=None, seqFeval=None, seqTol=None):
-    opts = {'maxiter':seqFeval, 'tol':seqTol} 
-    subMin = optimize.minimize(criteria_function, xStart, constraints=cons, options=opts, method='COBYLA')
+def pool_job(xStart, criteria_function=None, lower=None, upper=None, cons=None, seqFeval=None, seqTol=None):
+    # bounds = [(a,b) for a, b in zip(lower, upper)]
+    
+    # subMin = minimize(criteria_function, xStart, bounds=bounds, constraints=cons, tol=seqTol)
+    
+    opts = {'maxiter':seqFeval, 'tol':seqTol, 'catol':seqTol}
+    subMin = minimize(criteria_function, xStart, constraints=cons, options=opts, method='COBYLA')
+    
+    # m = len(cons(xStart))
+    
+    # def calcfc(x, con):
+    #     xa = np.copy(x)
+    #     f = criteria_function(np.copy(xa))
+    #     con[:] = cons(xa)
+    #     return f
+    
+    # def wrapped_callback(x):
+    #     return
+    
+    # xopt, info = cobyla.minimize(calcfc, m=m, x=np.copy(xStart), rhobeg=1,
+    #                               rhoend=seqTol, iprint=0, maxfun=seqFeval,
+    #                               dinfo=np.zeros(4, np.float64), callback=wrapped_callback)
+    
+    # subMin = OptimizeResult(x=xopt,
+    #                       status=int(info[0]),
+    #                       success=info[0] == 1,
+    #                       message={1: 'Optimization terminated successfully.',
+    #                                 2: 'Maximum number of function evaluations '
+    #                                   'has been exceeded.',
+    #                                 3: 'Rounding errors are becoming damaging '
+    #                                   'in COBYLA subroutine.',
+    #                                 4: 'Did not converge to a solution '
+    #                                   'satisfying the constraints. See '
+    #                                   '`maxcv` for magnitude of violation.',
+    #                                 5: 'NaN result encountered.'
+    #                                 }.get(info[0], 'Unknown exit status.'),
+    #                       nfev=int(info[1]),
+    #                       fun=info[2],
+    #                       maxcv=info[3])
     return subMin
 
 def trainSurrogate(kernel, A, GresRescaled, GresPlogRescaled, FresStandardized, FresPlogStandardized, cheapConstr, cheapObj):
@@ -627,7 +669,7 @@ def cheap_SAMO_COBRA_PhaseII(cobra):
         constraint_solutions = np.zeros((nsol, cobra['nConstraints']))
         i = 0
         for xi in submins_xs:
-            potentialSolution = get_potentialSolution(xi, surrogateModels, bestPredictor, cobra['nObj'], cobra['infillCriteria'], cobra['FresPlogStandardizedStd'], cobra['FresStandardizedStd'], cobra['FresPlogStandardizedMean'], cobra['FresStandardizedMean'], fnCheap, cobra['cheapObj'])
+            potentialSolution = get_potentialSolution(xi, cobra['lower'], cobra['upper'], surrogateModels, bestPredictor, cobra['nObj'], cobra['infillCriteria'], cobra['FresPlogStandardizedStd'], cobra['FresStandardizedStd'], cobra['FresPlogStandardizedMean'], cobra['FresStandardizedMean'], fnCheap, cobra['cheapObj'])
             solutions[i] = potentialSolution
             constraintPrediction = getConstraintPrediction(xi, surrogateModels, bestPredictor, cobra['nConstraints'], cobra['GresPlogRescaledDivider'], cobra['GresRescaledDivider'], fnCheap, cobra['cheapCon'], cobra['EPS'])
             constraint_solutions[i] = constraintPrediction
@@ -681,55 +723,28 @@ def cheap_SAMO_COBRA_PhaseII(cobra):
             
     def findSurrogateMinimum(cobra, surrogateModels, bestPredictor, pool):
         submins = []
-        # besti = 0
-        # bestFun = 0
-        # success = []
+        gCOBRA_partial = None
         cons = []
-        
         if cobra['batch'] == 1:
             xStarts = computeStartPoints(cobra, cobra['computeStartingPoints'])
             gCOBRA_partial = partial(gCOBRA, A=cobra['A'], lower=cobra['lower'], upper=cobra['upper'], surrogateModels=surrogateModels, bestPredictor=bestPredictor, nConstraints=cobra['nConstraints'], GresRescaledDivider=cobra['GresRescaledDivider'], fnCheap=fnCheap, cheapCon=cobra['cheapCon'], EPS=cobra['EPS'])
-            cons.append({'type':'ineq','fun':gCOBRA_partial})
-            compute_infill_criteria_score_partial = partial(compute_infill_criteria_score, surrogateModels=surrogateModels, bestPredictor=bestPredictor, nObj=cobra['nObj'], infillCriteria=cobra['infillCriteria'], FresPlogStandardizedStd=cobra['FresPlogStandardizedStd'], FresStandardizedStd=cobra['FresStandardizedStd'], FresPlogStandardizedMean=cobra['FresPlogStandardizedMean'], FresStandardizedMean=cobra['FresStandardizedMean'], currentHV=cobra['currentHV'], paretoFrontier=cobra['paretoFrontier'], ref=cobra['ref'], fnCheap=fnCheap, cheapObj=cobra['cheapObj'])
+            cons.append({'type':'ineq', 'fun':gCOBRA_partial})
+            compute_infill_criteria_score_partial = partial(compute_infill_criteria_score, lower=cobra['lower'], upper=cobra['upper'], surrogateModels=surrogateModels, bestPredictor=bestPredictor, nObj=cobra['nObj'], infillCriteria=cobra['infillCriteria'], FresPlogStandardizedStd=cobra['FresPlogStandardizedStd'], FresStandardizedStd=cobra['FresStandardizedStd'], FresPlogStandardizedMean=cobra['FresPlogStandardizedMean'], FresStandardizedMean=cobra['FresStandardizedMean'], currentHV=cobra['currentHV'], paretoFrontier=cobra['paretoFrontier'], ref=cobra['ref'], fnCheap=fnCheap, cheapObj=cobra['cheapObj'])
         else:
             xStarts = computeStartPoints(cobra, cobra['computeStartingPoints']*cobra['batch'])
             xStarts = xStarts.reshape((cobra['computeStartingPoints'],len(cobra['lower'])*cobra['batch']))
-            gCOBRA_partial = partial(batch_gCOBRA, batch=cobra['batch'], A=cobra['A'], lower=cobra['lower'], upper=cobra['upper'], surrogateModels=surrogateModels, bestPredictor=bestPredictor, nConstraints=cobra['nConstraints'], GresRescaledDivider=cobra['GresRescaledDivider'], fnCheap=fnCheap, cheapCon=cobra['cheapCon'], EPS=cobra['EPS'])
-            cons.append({'type':'ineq','fun':gCOBRA_partial})
-            compute_infill_criteria_score_partial = partial(batch_infill_criteria_score, batch=cobra['batch'], surrogateModels=surrogateModels, bestPredictor=bestPredictor, nObj=cobra['nObj'], infillCriteria=cobra['infillCriteria'], FresPlogStandardizedStd=cobra['FresPlogStandardizedStd'], FresStandardizedStd=cobra['FresStandardizedStd'], FresPlogStandardizedMean=cobra['FresPlogStandardizedMean'], FresStandardizedMean=cobra['FresStandardizedMean'], paretoFrontier=cobra['paretoFrontier'], ref=cobra['ref'], fnCheap=fnCheap, cheapObj=cobra['cheapObj'])
-        f = partial(pool_job, criteria_function=compute_infill_criteria_score_partial, cons=cons, seqFeval = cobra['seqFeval'], seqTol=cobra['seqTol'])
+            batch_gCOBRA_partial = partial(batch_gCOBRA, batch=cobra['batch'], A=cobra['A'], lower=cobra['lower'], upper=cobra['upper'], surrogateModels=surrogateModels, bestPredictor=bestPredictor, nConstraints=cobra['nConstraints'], GresRescaledDivider=cobra['GresRescaledDivider'], fnCheap=fnCheap, cheapCon=cobra['cheapCon'], EPS=cobra['EPS'])
+            cons.append({'type':'ineq', 'fun':batch_gCOBRA_partial})
+            compute_infill_criteria_score_partial = partial(batch_infill_criteria_score, batch=cobra['batch'], lower=cobra['lower'], upper=cobra['upper'], surrogateModels=surrogateModels, bestPredictor=bestPredictor, nObj=cobra['nObj'], infillCriteria=cobra['infillCriteria'], FresPlogStandardizedStd=cobra['FresPlogStandardizedStd'], FresStandardizedStd=cobra['FresStandardizedStd'], FresPlogStandardizedMean=cobra['FresPlogStandardizedMean'], FresStandardizedMean=cobra['FresStandardizedMean'], paretoFrontier=cobra['paretoFrontier'], ref=cobra['ref'], fnCheap=fnCheap, cheapObj=cobra['cheapObj'])
+        f = partial(pool_job, criteria_function=compute_infill_criteria_score_partial, lower=list(cobra['lower'])*cobra['batch'], upper=list(cobra['upper'])*cobra['batch'], cons=cons, seqFeval = cobra['seqFeval'], seqTol=cobra['seqTol'])
         if pool:
             submins = pool.map(f, xStarts)
         else:
             for xStart in xStarts:
                 submins.append(f(xStart))
 
-        # for i in range(len(submins)):
-        #     subMin = submins[i]
-        #     success.append(subMin['success'])
-        #     if subMin['fun'] < bestFun and subMin['success']:
-        #         bestFun = subMin['fun']
-        #         besti = i
+        xNew, status = combineBest(submins[1:], cobra, surrogateModels, bestPredictor, fnCheap)
         
-        xNew, status = combineBest(submins, cobra, surrogateModels, bestPredictor, fnCheap)
-        
-        # if all(success):
-        #     minRequiredEvaluations = (cobra['dimension']+cobra['nConstraints']+cobra['nObj']+cobra['batch'])*20
-        #     adjustedAmountEvaluations = int(cobra['seqFeval']*(1-cobra['surrogateUpdateLearningRate']))
-        #     cobra['seqFeval'] = max(adjustedAmountEvaluations, minRequiredEvaluations)
-            
-        #     maxStartingPoints = (cobra['dimension']+cobra['nConstraints']+cobra['nObj'])*10*(1+int(cobra['batch']>1))*(1+int(cobra['oneShot']))
-        #     adjustedAmountPoints = int(cobra['computeStartingPoints']*(1+cobra['surrogateUpdateLearningRate']))
-        #     cobra['computeStartingPoints'] = min(maxStartingPoints, adjustedAmountPoints)
-        # else:
-        #     maxRequiredEvaluations = (cobra['dimension']+cobra['nConstraints']+cobra['nObj'])*1000*(1+int(cobra['batch']>1))*(1+int(cobra['oneShot']))
-        #     adjustedAmountEvaluations = int(cobra['seqFeval']*(1+cobra['surrogateUpdateLearningRate']))
-        #     cobra['seqFeval'] = min(adjustedAmountEvaluations, maxRequiredEvaluations)
-            
-        #     minRequiredPoints = 2*(cobra['dimension']+cobra['nConstraints']+cobra['nObj']+cobra['batch'])
-        #     adjustedAmountPoints = int(cobra['computeStartingPoints']*(1-cobra['surrogateUpdateLearningRate']))
-        #     cobra['computeStartingPoints'] = max(adjustedAmountPoints, minRequiredPoints)
-                
         cobra['optimizerConvergence'] = np.append(cobra['optimizerConvergence'], status)        
         return xNew   
     

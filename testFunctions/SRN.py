@@ -13,7 +13,7 @@ class SRN:
         self.nConstraints = 2
         self.nObj = 2 
         self.ref =  np.array([301,72])
-        self.nadir = np.array([222.97, 2.60])
+        self.nadir = np.array([222.99, 2.62])
         self.cheapConstr = [False, False]
         self.cheapObj = [False, False]
 

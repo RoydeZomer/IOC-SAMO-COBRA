@@ -29,7 +29,7 @@ class OSY:
         self.nConstraints = 6
         self.nObj = 2
         self.ref = np.array([0,386])
-        self.nadir = np.array([-42.17, 76.00])
+        self.nadir = np.array([-41.81, 76.00])
         self.cheapConstr = [False, False, False, False, False, False]
         self.cheapObj = [False, False]
 

@@ -48,12 +48,12 @@ def cheap_SAMO_COBRA_Init(problem, nCores=7, computeStartingPoints=16,
     if hasattr(problem, 'nConstraints'):
         nConstraints = problem.nConstraints
     else:
-        raise ValueError('Problem class must at least have the number of constraints defined in nConstraints ref object')
+        raise ValueError('Problem class must at least have the number of constraints defined in nConstraints parameter')
         
     if hasattr(problem, 'ref'):
         ref = problem.ref
     else:
-        raise ValueError('Problem class must at least have a reference point defined in ref object')
+        raise ValueError('Problem class must at least have a reference point defined in ref prameter')
     
     if hasattr(problem, 'lower'):
         originalL = problem.lower
@@ -89,7 +89,7 @@ def cheap_SAMO_COBRA_Init(problem, nCores=7, computeStartingPoints=16,
     lower = np.array([newlower]*dimension)
     upper = np.array([newupper]*dimension)
     
-    l = newlower-newupper
+    l = newupper-newlower
     if epsilonInit is None:
         epsilonInit = [0.02*l]*nConstraints
     if epsilonMax is None:

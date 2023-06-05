@@ -14,7 +14,7 @@ class CTP1:
         self.nConstraints = 2
         self.nObj = 2
         self.ref = np.array([1,2])
-        self.nadir = np.array([0.99, 1.00])
+        self.nadir = np.array([1.00, 1.00])
         self.cheapConstr = [True, True]
         self.cheapObj = [False, False]
 
