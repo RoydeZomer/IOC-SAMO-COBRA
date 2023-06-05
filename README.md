@@ -71,5 +71,6 @@ if __name__ == '__main__':
     cobra = cheap_SAMO_COBRA_PhaseII(cobra)
 
 ```
-Results on all test functions in table format can be found in the following Table:
-![alt text](https://github.com/RoydeZomer/IOC-SAMO-COBRA/blob/main/allresults.PNG?raw=true)
+Results on all test functions in table format can be found in the following two figures:
+![alt text](https://github.com/RoydeZomer/IOC-SAMO-COBRA/blob/main/suplementary%20material/allresultsHV.PNG?raw=true)
+![alt text](https://github.com/RoydeZomer/IOC-SAMO-COBRA/blob/main/suplementary%20material/allresultsIGD.PNG?raw=true)
