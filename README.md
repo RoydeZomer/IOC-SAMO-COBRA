@@ -1,7 +1,7 @@
 # IOC-SAMO-COBRA
 Efficient Multi-Objective Optimization for Problems with (In)expensive Objectives and Constraints
 
-Expensive objectives and constraints are a key characteristic of real-world multi-objective optimization problems. In practice they often occur jointly with inexpensive objectives and constraints. This repository presents an extension of the Self-Adapting Multi-Objective Constraint Optimization algorithm that uses Radial Basis function Approximations (SAMO-COBRA) for handling such mixed expensive-inexpensive objectives and constraints. In this repository you can find the algorithm code, the raw results presented in the paper, and all the EAF Difference plots of 2 objective optimization problems. 
+Expensive objectives and constraints are a key characteristic of real-world multi-objective optimization problems. In practice they often occur jointly with inexpensive objectives and constraints. This repository presents an extension of the Self-Adapting Multi-Objective Constraint Optimization algorithm that uses Radial Basis function Approximations (SAMO-COBRA) for handling such mixed expensive-inexpensive objectives and constraints. In this repository you can find the algorithm code, and the supplementary material with the full result tables, the IGD+ performance metric ECDF, the EAF Difference plots of 2 objective optimization problems and all the raw results. 
 
 Here an example on how to use the algorithm on the BNH test problem:
 ```python
