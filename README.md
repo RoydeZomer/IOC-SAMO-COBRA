@@ -6,6 +6,7 @@ Expensive objectives and constraints are a key characteristic of real-world mult
 Here an example on how to use the algorithm on the BNH test problem:
 ```python
 import numpy as np
+from multiprocessing import cpu_count
 from multiprocessing import freeze_support
 
 from cheap_SAMO_COBRA_Init import cheap_SAMO_COBRA_Init
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     # The algorithm starts searching new candidate solutions from random locations in the search space.
     seed = 1 #Influence the random lacations by setting the seed
     batch = 5 # how many candidate solutions do you want to evaluate per iteration? should be larger or equal to 1. 
-    nCores = multiprocessing.cpu_count() # define how many cores you want to use for the optimization process. 
+    nCores = cpu_count() # define how many cores you want to use for the optimization process. 
     
     problem = BNH() # test problem class
     problem.cheapConstr = [True]*len(problem.cheapConstr) # example where the constraints are considered as cheap
