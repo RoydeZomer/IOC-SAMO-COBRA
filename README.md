@@ -59,7 +59,7 @@ class BNH:
 if __name__ == '__main__':  
     freeze_support() # required for multiprocessing on windows machines
     # The algorithm starts searching new candidate solutions from random locations in the search space.
-    seed = 1 Influence the random lacations by setting the seed
+    seed = 1 #Influence the random lacations by setting the seed
     batch = 5 # how many candidate solutions do you want to evaluate per iteration? should be larger or equal to 1. 
     nCores = multiprocessing.cpu_count() # define how many cores you want to use for the optimization process. 
     
