@@ -8,8 +8,8 @@ Here an example on how to use the algorithm on the BNH test problem:
 import numpy as np
 from multiprocessing import freeze_support
 
-from pSAMO_COBRA_Init import pSAMO_COBRA_Init
-from pSAMO_COBRA_PhaseII import pSAMO_COBRA_PhaseII
+from cheap_SAMO_COBRA_Init import cheap_SAMO_COBRA_Init
+from cheap_SAMO_COBRA_PhaseII import cheap_SAMO_COBRA_PhaseII
 
 # example test function class two variables, two constraints, two objectives
 class BNH:
