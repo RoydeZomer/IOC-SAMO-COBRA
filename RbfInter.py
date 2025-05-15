@@ -164,6 +164,11 @@ def fitRBF(phi, U, ptail=True, squares=False, xp=None, rbftype="THINPLATESPLINE"
     return rbfmodel    
 
 def trainRBF(xp, U, ptail=True, squares=False, smooth=0.001, rbftype="THINPLATESPLINE"):
+    #delete rows without an independent variable
+    keep = ~np.isnan(U)
+    U = U[keep]
+    xp = xp[keep]
+    
     edist = euclidean_distances(xp)
     # edist = edist + np.eye(len(xp))*smooth
     width = 1
